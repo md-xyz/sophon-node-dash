@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Search, SortAsc, SortDesc, Grid, List, ChevronDown } from 'lucide-react';
+import { StatsSkeleton, ChartSkeleton, TableRowSkeleton, CardSkeleton } from '@/components/ui/skeletons';
 
 const NodeDashboard = () => {
     const [nodes, setNodes] = useState([]);
@@ -9,9 +10,11 @@ const NodeDashboard = () => {
     const [sortConfig, setSortConfig] = useState({ key: 'uptime', direction: 'desc' });
     const [viewMode, setViewMode] = useState('list');
     const [showSortMenu, setShowSortMenu] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         const fetchData = async () => {
+            setIsLoading(true);
             try {
                 const response = await fetch('https://monitor.sophon.xyz/nodes');
                 const data = await response.json();
@@ -19,11 +22,35 @@ const NodeDashboard = () => {
                 setFilteredNodes(data.nodes);
             } catch (error) {
                 console.error('Error fetching nodes:', error);
+            } finally {
+                setIsLoading(false);
             }
         };
 
         fetchData();
     }, []);
+
+    // Memoize calculations
+    const stats = useMemo(() => ({
+        totalNodes: nodes.length,
+        activeNodes: nodes.filter(n => n.status).length,
+        avgUptime: nodes.length ? (nodes.reduce((acc, n) => acc + n.uptime, 0) / nodes.length).toFixed(2) : 0,
+        avgFee: nodes.length ? (nodes.reduce((acc, n) => acc + n.fee, 0) / nodes.length).toFixed(2) : 0
+    }), [nodes]);
+
+    const feeChartData = useMemo(() => {
+        const distribution = nodes.reduce((acc, node) => {
+            const feeKey = node.fee.toString();
+            acc[feeKey] = (acc[feeKey] || 0) + 1;
+            return acc;
+        }, {});
+
+        return Object.entries(distribution)
+            .map(([fee, count]) => ({
+                fee: `${fee}%`,
+                count
+            }));
+    }, [nodes]);
 
     // Sort options
     const sortOptions = [
@@ -32,34 +59,17 @@ const NodeDashboard = () => {
         { key: 'status', label: 'Status' },
     ];
 
-    // Calculate statistics
-    const stats = {
-        totalNodes: nodes.length,
-        activeNodes: nodes.filter(n => n.status).length,
-        avgUptime: nodes.length ? (nodes.reduce((acc, n) => acc + n.uptime, 0) / nodes.length).toFixed(2) : 0,
-        avgFee: nodes.length ? (nodes.reduce((acc, n) => acc + n.fee, 0) / nodes.length).toFixed(2) : 0
-    };
+    // Handle search with debounce
+    useEffect(() => {
+        const timeoutId = setTimeout(() => {
+            const filtered = nodes.filter(node =>
+                node.operator.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+            setFilteredNodes(filtered);
+        }, 300);
 
-    // Prepare fee distribution data
-    const feeDistribution = nodes.reduce((acc, node) => {
-        const feeKey = node.fee.toString();
-        acc[feeKey] = (acc[feeKey] || 0) + 1;
-        return acc;
-    }, {});
-
-    const feeChartData = Object.entries(feeDistribution).map(([fee, count]) => ({
-        fee: `${fee}%`,
-        count
-    }));
-
-    // Handle search
-    const handleSearch = (term) => {
-        setSearchTerm(term);
-        const filtered = nodes.filter(node =>
-            node.operator.toLowerCase().includes(term.toLowerCase())
-        );
-        setFilteredNodes(filtered);
-    };
+        return () => clearTimeout(timeoutId);
+    }, [searchTerm, nodes]);
 
     // Handle sorting
     const handleSort = (key) => {
@@ -85,7 +95,7 @@ const NodeDashboard = () => {
             <SortDesc className="h-4 w-4 inline ml-1" />;
     };
 
-    // Node Card Component for Grid View
+    // Node Card Component
     const NodeCard = ({ node }) => (
         <div className="bg-white p-4 rounded-lg shadow hover:shadow-lg transition-shadow">
             <div className="flex justify-between items-start mb-3">
@@ -121,39 +131,56 @@ const NodeDashboard = () => {
 
             {/* Stats Overview */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                <div className="bg-white p-4 rounded-lg shadow">
-                    <h3 className="text-gray-500">Total Nodes</h3>
-                    <p className="text-2xl font-bold">{stats.totalNodes}</p>
-                </div>
-                <div className="bg-white p-4 rounded-lg shadow">
-                    <h3 className="text-gray-500">Active Nodes</h3>
-                    <p className="text-2xl font-bold">{stats.activeNodes}</p>
-                </div>
-                <div className="bg-white p-4 rounded-lg shadow">
-                    <h3 className="text-gray-500">Average Uptime</h3>
-                    <p className="text-2xl font-bold">{stats.avgUptime}%</p>
-                </div>
-                <div className="bg-white p-4 rounded-lg shadow">
-                    <h3 className="text-gray-500">Average Fee</h3>
-                    <p className="text-2xl font-bold">{stats.avgFee}%</p>
-                </div>
+                {isLoading ? (
+                    <>
+                        <StatsSkeleton />
+                        <StatsSkeleton />
+                        <StatsSkeleton />
+                        <StatsSkeleton />
+                    </>
+                ) : (
+                    <>
+                        <div className="bg-white p-4 rounded-lg shadow">
+                            <h3 className="text-gray-500">Total Nodes</h3>
+                            <p className="text-2xl font-bold">{stats.totalNodes}</p>
+                        </div>
+                        <div className="bg-white p-4 rounded-lg shadow">
+                            <h3 className="text-gray-500">Active Nodes</h3>
+                            <p className="text-2xl font-bold">{stats.activeNodes}</p>
+                        </div>
+                        <div className="bg-white p-4 rounded-lg shadow">
+                            <h3 className="text-gray-500">Average Uptime</h3>
+                            <p className="text-2xl font-bold">{stats.avgUptime}%</p>
+                        </div>
+                        <div className="bg-white p-4 rounded-lg shadow">
+                            <h3 className="text-gray-500">Average Fee</h3>
+                            <p className="text-2xl font-bold">{stats.avgFee}%</p>
+                        </div>
+                    </>
+                )}
             </div>
 
             {/* Fee Distribution Chart */}
             <div className="bg-white p-4 rounded-lg shadow mb-8">
-                <h2 className="text-xl font-bold mb-4">Fee Distribution</h2>
-                <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={feeChartData}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="fee" />
-                            <YAxis />
-                            <Tooltip />
-                            <Legend />
-                            <Bar dataKey="count" fill="#3B82F6" name="Number of Nodes" />
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
+                {isLoading ? (
+                    <ChartSkeleton />
+                ) : (
+                    <>
+                        <h2 className="text-xl font-bold mb-4">Fee Distribution</h2>
+                        <div className="h-64">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={feeChartData}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="fee" />
+                                    <YAxis />
+                                    <Tooltip />
+                                    <Legend />
+                                    <Bar dataKey="count" fill="#3B82F6" name="Number of Nodes" />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </>
+                )}
             </div>
 
             {/* Node List/Grid */}
@@ -214,13 +241,37 @@ const NodeDashboard = () => {
                                 placeholder="Search by operator address..."
                                 className="pl-10 pr-4 py-2 border rounded-lg w-full"
                                 value={searchTerm}
-                                onChange={(e) => handleSearch(e.target.value)}
+                                onChange={(e) => setSearchTerm(e.target.value)}
                             />
                         </div>
                     </div>
                 </div>
 
-                {viewMode === 'list' ? (
+                {isLoading ? (
+                    viewMode === 'list' ? (
+                        <table className="w-full">
+                            <thead>
+                                <tr className="border-b">
+                                    <th className="p-2 text-left">Operator</th>
+                                    <th className="p-2 text-left">Status</th>
+                                    <th className="p-2 text-left">Uptime</th>
+                                    <th className="p-2 text-left">Fee</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {[...Array(5)].map((_, i) => (
+                                    <TableRowSkeleton key={i} />
+                                ))}
+                            </tbody>
+                        </table>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                            {[...Array(8)].map((_, i) => (
+                                <CardSkeleton key={i} />
+                            ))}
+                        </div>
+                    )
+                ) : viewMode === 'list' ? (
                     <div className="overflow-x-auto">
                         <table className="w-full">
                             <thead>
