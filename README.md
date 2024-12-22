@@ -1,0 +1,1 @@
+A dashboard to monitor sophon nodes
