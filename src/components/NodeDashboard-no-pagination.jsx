@@ -4,7 +4,6 @@ import { Search, SortAsc, SortDesc, Grid, List, ChevronDown } from 'lucide-react
 import { StatsSkeleton, ChartSkeleton, TableRowSkeleton, CardSkeleton } from '@/components/ui/skeletons';
 
 const NodeDashboard = () => {
-    // State management
     const [nodes, setNodes] = useState([]);
     const [filteredNodes, setFilteredNodes] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
@@ -13,11 +12,6 @@ const NodeDashboard = () => {
     const [showSortMenu, setShowSortMenu] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
 
-    // Pagination state
-    const [itemsPerPage, setItemsPerPage] = useState(50);
-    const [currentPage, setCurrentPage] = useState(1);
-
-    // Data fetching
     useEffect(() => {
         const fetchData = async () => {
             setIsLoading(true);
@@ -36,21 +30,7 @@ const NodeDashboard = () => {
         fetchData();
     }, []);
 
-    // Reset to first page when search/filter changes
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [searchTerm, itemsPerPage]);
-
-    // Calculate pagination
-    const paginatedNodes = useMemo(() => {
-        const startIndex = (currentPage - 1) * itemsPerPage;
-        const endIndex = startIndex + itemsPerPage;
-        return filteredNodes.slice(startIndex, endIndex);
-    }, [filteredNodes, currentPage, itemsPerPage]);
-
-    const totalPages = Math.ceil(filteredNodes.length / itemsPerPage);
-
-    // Memoized calculations
+    // Memoize calculations
     const stats = useMemo(() => ({
         totalNodes: nodes.length,
         activeNodes: nodes.filter(n => n.status).length,
@@ -105,7 +85,6 @@ const NodeDashboard = () => {
 
         setFilteredNodes(sorted);
         setShowSortMenu(false);
-        setCurrentPage(1); // Reset to first page when sorting
     };
 
     // Sort indicator component
@@ -114,66 +93,6 @@ const NodeDashboard = () => {
         return sortConfig.direction === 'asc' ?
             <SortAsc className="h-4 w-4 inline ml-1" /> :
             <SortDesc className="h-4 w-4 inline ml-1" />;
-    };
-
-    // Pagination controls component
-    const PaginationControls = () => {
-        const startIndex = (currentPage - 1) * itemsPerPage;
-        const endIndex = Math.min(startIndex + itemsPerPage, filteredNodes.length);
-
-        return (
-            <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-4 border-t pt-4">
-                <div className="text-sm text-gray-700">
-                    Showing {startIndex + 1} to {endIndex} of {filteredNodes.length} results
-                </div>
-                <div className="flex items-center gap-2">
-                    <button
-                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                        disabled={currentPage === 1}
-                        className="px-3 py-1 border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                    >
-                        Previous
-                    </button>
-                    <div className="flex items-center gap-1">
-                        {[...Array(totalPages)].map((_, i) => {
-                            const page = i + 1;
-                            // Show first page, last page, current page, and one page before/after current
-                            if (
-                                page === 1 ||
-                                page === totalPages ||
-                                (page >= currentPage - 1 && page <= currentPage + 1)
-                            ) {
-                                return (
-                                    <button
-                                        key={page}
-                                        onClick={() => setCurrentPage(page)}
-                                        className={`px-3 py-1 border rounded-lg ${currentPage === page
-                                                ? 'bg-blue-600 text-white'
-                                                : 'hover:bg-gray-50'
-                                            }`}
-                                    >
-                                        {page}
-                                    </button>
-                                );
-                            } else if (
-                                page === currentPage - 2 ||
-                                page === currentPage + 2
-                            ) {
-                                return <span key={page} className="px-1">...</span>;
-                            }
-                            return null;
-                        })}
-                    </div>
-                    <button
-                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                        disabled={currentPage === totalPages}
-                        className="px-3 py-1 border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                    >
-                        Next
-                    </button>
-                </div>
-            </div>
-        );
     };
 
     // Node Card Component
@@ -288,17 +207,6 @@ const NodeDashboard = () => {
                     </div>
 
                     <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center">
-                        {/* Items per page selector */}
-                        <select
-                            value={itemsPerPage}
-                            onChange={(e) => setItemsPerPage(Number(e.target.value))}
-                            className="px-3 py-2 border rounded-lg bg-white hover:bg-gray-50"
-                        >
-                            <option value={50}>50 per page</option>
-                            <option value={100}>100 per page</option>
-                            <option value={200}>200 per page</option>
-                        </select>
-
                         {/* Sort Dropdown */}
                         <div className="relative">
                             <button
@@ -374,7 +282,9 @@ const NodeDashboard = () => {
                                             className="flex items-center gap-1"
                                         >
                                             Operator
-                                            <SortIndicator sortKey="operator" />
+                                            {sortConfig.key === 'operator' && (
+                                                sortConfig.direction === 'asc' ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />
+                                            )}
                                         </button>
                                     </th>
                                     <th className="p-2 text-left">
@@ -383,7 +293,9 @@ const NodeDashboard = () => {
                                             className="flex items-center gap-1"
                                         >
                                             Status
-                                            <SortIndicator sortKey="status" />
+                                            {sortConfig.key === 'status' && (
+                                                sortConfig.direction === 'asc' ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />
+                                            )}
                                         </button>
                                     </th>
                                     <th className="p-2 text-left">
@@ -392,7 +304,9 @@ const NodeDashboard = () => {
                                             className="flex items-center gap-1"
                                         >
                                             Uptime
-                                            <SortIndicator sortKey="uptime" />
+                                            {sortConfig.key === 'uptime' && (
+                                                sortConfig.direction === 'asc' ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />
+                                            )}
                                         </button>
                                     </th>
                                     <th className="p-2 text-left">
@@ -401,13 +315,15 @@ const NodeDashboard = () => {
                                             className="flex items-center gap-1"
                                         >
                                             Fee
-                                            <SortIndicator sortKey="fee" />
+                                            {sortConfig.key === 'fee' && (
+                                                sortConfig.direction === 'asc' ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />
+                                            )}
                                         </button>
                                     </th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {paginatedNodes.map((node, index) => (
+                                {filteredNodes.map((node, index) => (
                                     <tr key={node.operator} className={index % 2 === 0 ? 'bg-gray-50' : ''}>
                                         <td className="p-2">
                                             <span className="font-mono text-sm">{node.operator}</span>
@@ -437,14 +353,11 @@ const NodeDashboard = () => {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                        {paginatedNodes.map((node) => (
+                        {filteredNodes.map((node) => (
                             <NodeCard key={node.operator} node={node} />
                         ))}
                     </div>
                 )}
-
-                {/* Pagination Controls */}
-                {!isLoading && filteredNodes.length > 0 && <PaginationControls />}
             </div>
         </div>
     );
