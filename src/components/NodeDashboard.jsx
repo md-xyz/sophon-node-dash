@@ -21,7 +21,8 @@ const NodeDashboard = () => {
         const fetchData = async () => {
             setIsLoading(true);
             try {
-                const response = await fetch('https://monitor.sophon.xyz/nodes');
+                // Request up to 10000 nodes by adding pagination parameters
+                const response = await fetch('https://monitor.sophon.xyz/nodes?page=1&per_page=10000');
                 const data = await response.json();
                 setNodes(data.nodes);
                 setFilteredNodes(data.nodes);
